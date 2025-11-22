@@ -17,30 +17,22 @@ stages:
     steps:
     - checkout: self
 
-    # Build the project using Maven and create WAR
     - task: Maven@3
       inputs:
         mavenPomFile: 'pom.xml'
-        mavenOptions: '-Xmx3072m'
+        goals: 'clean package spring-boot:repackage'
         javaHomeOption: 'JDKVersion'
         jdkVersionOption: '1.11'
-        jdkArchitectureOption: 'x64'
-        publishJUnitResults: true
-        testResultsFiles: '**/surefire-reports/TEST-*.xml'
-        goals: 'clean package spring-boot:repackage'
 
-    # Debug: List files to verify WAR
     - script: |
-        echo "Listing repository root:"
-        ls -lh
         echo "Listing target folder:"
         ls -lh target
       displayName: 'Debug: List files'
 
-    # ✅ Publish WAR artifact
+    # ✅ Publish entire target folder (contains WAR)
     - task: PublishPipelineArtifact@1
       inputs:
-        targetPath: '$(Build.SourcesDirectory)/target/spring-boot-rest-example-*.war'
+        targetPath: '$(Build.SourcesDirectory)/target'
         artifactName: 'javaapp'
 
 # =========================
@@ -53,31 +45,24 @@ stages:
   - job: DeployJob
     displayName: 'Deploy to Remote Server'
     pool:
-      name: 'Java_Deployment'   # Self-hosted agent pool
+      name: 'Java_Deployment'
     steps:
-    # Download the artifact from Build stage
     - download: current
       artifact: 'javaapp'
 
-    # Copy artifact over SSH to remote server
     - task: CopyFilesOverSSH@0
       inputs:
-        sshEndpoint: 'Java_YAML'  # SSH service connection name
+        sshEndpoint: 'Java_YAML'
         sourceFolder: '$(Pipeline.Workspace)/javaapp'
         contents: '*.war'
         targetFolder: '/home/itadmin/javaapp'
-        cleanTargetFolder: false
 
-    # Run deployment commands on the remote server
     - task: SSH@0
       inputs:
         sshEndpoint: 'Java_YAML'
         runOptions: 'commands'
         commands: |
-          echo "Stopping existing backend application (if any)..."
           pkill -f spring-boot-rest-example-*.war || true
-          echo "Starting new backend application..."
           nohup java -jar /home/itadmin/javaapp/spring-boot-rest-example-*.war \
             --spring.config.location=file:/home/itadmin/javaapp/application.properties \
             > /home/itadmin/javaapp/app.log 2>&1 &
-          echo "Deployment completed"
