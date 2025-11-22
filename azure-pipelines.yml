@@ -11,9 +11,10 @@ stages:
     pool:
       vmImage: ubuntu-latest
     steps:
+    # Build with Maven
     - task: Maven@3
       inputs:
-        mavenPomFile: 'pom.xml'
+        mavenPomFile: 'javaapp/pom.xml'
         mavenOptions: '-Xmx3072m'
         javaHomeOption: 'JDKVersion'
         jdkVersionOption: '1.11'
@@ -22,7 +23,12 @@ stages:
         testResultsFiles: '**/surefire-reports/TEST-*.xml'
         goals: 'package'
 
-    - publish: 'target/*.jar'
+    # Optional: List files to verify JAR
+    - script: ls -R
+      displayName: 'List all files'
+
+    # Publish the JAR artifact
+    - publish: 'javaapp/target/*.jar'
       artifact: 'javaapp'
 
 # Stage 2: Deploy
