@@ -32,7 +32,9 @@ stages:
     # Debug: List files to verify WAR
     - script: |
         echo "Listing repository root:"
-        ls - ls -lh target
+        ls -lh
+        echo "Listing target folder:"
+        ls -lh target
       displayName: 'Debug: List files'
 
     # Publish the WAR artifact
