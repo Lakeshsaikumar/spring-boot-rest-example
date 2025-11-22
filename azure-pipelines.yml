@@ -1,22 +1,61 @@
-# Maven
-# Build your Java project and run tests with Apache Maven.
-# Add steps that analyze code, save build artifacts, deploy, and more:
-# https://docs.microsoft.com/azure/devops/pipelines/languages/java
-
 trigger:
 - master
 
-pool:
-  vmImage: ubuntu-latest
+stages:
+# Stage 1: Build
+- stage: Build
+  displayName: 'Build and Test'
+  jobs:
+  - job: BuildJob
+    displayName: 'Build Maven Project'
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+    - task: Maven@3
+      inputs:
+        mavenPomFile: 'pom.xml'
+        mavenOptions: '-Xmx3072m'
+        javaHomeOption: 'JDKVersion'
+        jdkVersionOption: '1.11'
+        jdkArchitectureOption: 'x64'
+        publishJUnitResults: true
+        testResultsFiles: '**/surefire-reports/TEST-*.xml'
+        goals: 'package'
 
-steps:
-- task: Maven@3
-  inputs:
-    mavenPomFile: 'pom.xml'
-    mavenOptions: '-Xmx3072m'
-    javaHomeOption: 'JDKVersion'
-    jdkVersionOption: '1.11'
-    jdkArchitectureOption: 'x64'
-    publishJUnitResults: true
-    testResultsFiles: '**/surefire-reports/TEST-*.xml'
-    goals: 'package'
+    - publish: 'target/*.jar'
+      artifact: 'javaapp'
+
+# Stage 2: Deploy
+- stage: Deploy
+  displayName: 'Deploy Artifact'
+  dependsOn: Build
+  jobs:
+  - job: DeployJob
+    displayName: 'Deploy to Environment'
+    pool:
+      name: Java_Deployment   # Self-hosted agent
+    steps:
+    # Download artifact from Build stage
+    - download: current
+      artifact: 'javaapp'
+
+    # Copy artifact over SSH
+    - task: CopyFilesOverSSH@0
+      inputs:
+        sshEndpoint: 'Java_YAML'  # SSH service connection
+        sourceFolder: '$(Pipeline.Workspace)/javaapp'
+        contents: '*.jar'
+        targetFolder: '/home/itadmin/javaapp'
+        cleanTargetFolder: false
+
+    # Run deployment commands on the server
+    - task: SSH@0
+      inputs:
+        sshEndpoint: 'Java_YAML'
+        runOptions: 'commands'
+        commands: |
+          echo "Stopping existing application (if any)..."
+          pkill -f JtSpringProject-0.0.1-SNAPSHOT.jar || true
+          echo "Starting new application..."
+          nohup java -jar /home/itadmin/javaapp/JtSpringProject-0.0.1-SNAPSHOT.jar --spring.config.location=file:/home/itadmin/javaapp/application.properties > app.log 2>&1 &
+          echo "Deployment completed"
