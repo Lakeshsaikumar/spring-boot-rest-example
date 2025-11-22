@@ -2,6 +2,7 @@ trigger:
 - master
 
 stages:
+
 # Stage 1: Build
 - stage: Build
   displayName: 'Build and Test'
@@ -11,26 +12,28 @@ stages:
     pool:
       vmImage: ubuntu-latest
     steps:
-    # Build with Maven
+    # Build the project using Maven
     - task: Maven@3
       inputs:
-        mavenPomFile: 'pom.xml'       # Repo root pom.xml
+        mavenPomFile: 'pom.xml'
         mavenOptions: '-Xmx3072m'
         javaHomeOption: 'JDKVersion'
         jdkVersionOption: '1.11'
         jdkArchitectureOption: 'x64'
         publishJUnitResults: true
         testResultsFiles: '**/surefire-reports/TEST-*.xml'
-        goals: 'package'
+        goals: 'clean package'
 
-    # Debug: list files to verify JAR exists
+    # Debug: List files to verify WAR
     - script: |
-        echo "Listing target folder contents:"
+        echo "Listing root folder:"
+        ls -lh
+        echo "Listing target folder:"
         ls -lh target
-      displayName: 'List target folder'
+      displayName: 'Debug: List files'
 
-    # Publish the JAR artifact
-    - publish: 'target/JtSpringProject-0.0.1-SNAPSHOT.jar'
+    # Publish the WAR artifact
+    - publish: 'target/*.war'
       artifact: 'javaapp'
 
 # Stage 2: Deploy
@@ -43,27 +46,27 @@ stages:
     pool:
       name: Java_Deployment   # Self-hosted agent
     steps:
-    # Download artifact from Build stage
+    # Download the artifact from Build stage
     - download: current
       artifact: 'javaapp'
 
-    # Copy artifact over SSH to remote Linux server
+    # Copy artifact over SSH to remote server
     - task: CopyFilesOverSSH@0
       inputs:
         sshEndpoint: 'Java_YAML'  # SSH service connection
         sourceFolder: '$(Pipeline.Workspace)/javaapp'
-        contents: '*.jar'
+        contents: '*.war'
         targetFolder: '/home/itadmin/javaapp'
         cleanTargetFolder: false
 
-    # Run deployment commands on the server
+    # Run deployment commands on the remote server
     - task: SSH@0
       inputs:
         sshEndpoint: 'Java_YAML'
         runOptions: 'commands'
         commands: |
-          echo "Stopping existing application (if any)..."
-          pkill -f JtSpringProject-0.0.1-SNAPSHOT.jar || true
-          echo "Starting new application..."
-          nohup java -jar /home/itadmin/javaapp/JtSpringProject-0.0.1-SNAPSHOT.jar --spring.config.location=file:/home/itadmin/javaapp/application.properties > app.log 2>&1 &
+          echo "Stopping existing backend application (if any)..."
+          pkill -f spring-boot-rest-example-*.war || true
+          echo "Starting new backend application..."
+          nohup java -jar /home/itadmin/javaapp/spring-boot-rest-example-*.war --spring.config.location=file:/home/itadmin/javaapp/application.properties > app.log 2>&1 &
           echo "Deployment completed"
