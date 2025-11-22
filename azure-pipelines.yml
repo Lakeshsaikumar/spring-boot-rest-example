@@ -26,14 +26,14 @@ stages:
 
     # Debug: List files to verify WAR
     - script: |
-        echo "Listing root folder:"
+        echo "Listing repository root:"
         ls -lh
         echo "Listing target folder:"
         ls -lh target
       displayName: 'Debug: List files'
 
     # Publish the WAR artifact
-    - publish: 'target/*.war'
+    - publish: 'target/spring-boot-rest-example-*.war'
       artifact: 'javaapp'
 
 # Stage 2: Deploy
@@ -54,7 +54,7 @@ stages:
     - task: CopyFilesOverSSH@0
       inputs:
         sshEndpoint: 'Java_YAML'  # SSH service connection
-        sourceFolder: '$(Pipeline.Workspace)/javaapp'
+        sourceFolder: '$(Pipeline.Workspace)/javaapp/target'
         contents: '*.war'
         targetFolder: '/home/itadmin/javaapp'
         cleanTargetFolder: false
