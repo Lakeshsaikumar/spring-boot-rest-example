@@ -1,0 +1,39 @@
+- stage: Deploy
+  displayName: "Deploy to Remote Server"
+  dependsOn: Build
+  jobs:
+  - job: DeployJob
+    displayName: "Deploy using Self-Hosted Agent"
+    pool:
+      name: Java_Development          # Self-hosted agent pool
+    steps:
+
+    - task: DownloadBuildArtifacts@0
+      displayName: "Download Artifact"
+      inputs:
+        buildType: current
+        downloadType: single
+        artifactName: drop
+        downloadPath: $(System.DefaultWorkingDirectory)
+
+    - task: CopyFilesOverSSH@0
+      displayName: "Copy JAR to Remote Server"
+      inputs:
+        sshEndpoint: "Java_YAML"     # SSH service connection
+        sourceFolder: "$(System.DefaultWorkingDirectory)/drop"
+        contents: "*.jar"
+        targetFolder: "/home/itadmin/javaapp"   # <- updated path
+
+    - task: SSH@0
+      displayName: "Restart Application on Remote Server"
+      inputs:
+        sshEndpoint: "Java_YAML"
+        runOptions: inline
+        inline: |
+          echo "Stopping old Java app..."
+          pkill -f "java -jar" || true
+
+          echo "Starting new app..."
+          nohup java -jar /home/itadmin/javaapp/*.jar > /home/itadmin/javaapp/app.log 2>&1 &
+
+          echo "Deployment completed!"
