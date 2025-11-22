@@ -14,7 +14,7 @@ stages:
     # Build with Maven
     - task: Maven@3
       inputs:
-        mavenPomFile: 'pom.xml'
+        mavenPomFile: 'pom.xml'       # Repo root pom.xml
         mavenOptions: '-Xmx3072m'
         javaHomeOption: 'JDKVersion'
         jdkVersionOption: '1.11'
@@ -23,12 +23,14 @@ stages:
         testResultsFiles: '**/surefire-reports/TEST-*.xml'
         goals: 'package'
 
-    # Optional: List files to verify JAR
-    - script: ls -R
-      displayName: 'List all files'
+    # Debug: list files to verify JAR exists
+    - script: |
+        echo "Listing target folder contents:"
+        ls -lh target
+      displayName: 'List target folder'
 
     # Publish the JAR artifact
-    - publish: 'target/*.jar'
+    - publish: 'target/JtSpringProject-0.0.1-SNAPSHOT.jar'
       artifact: 'javaapp'
 
 # Stage 2: Deploy
@@ -45,7 +47,7 @@ stages:
     - download: current
       artifact: 'javaapp'
 
-    # Copy artifact over SSH
+    # Copy artifact over SSH to remote Linux server
     - task: CopyFilesOverSSH@0
       inputs:
         sshEndpoint: 'Java_YAML'  # SSH service connection
