@@ -28,7 +28,7 @@ stages:
       displayName: 'List all files'
 
     # Publish the JAR artifact
-    - publish: 'javaapp/target/*.jar'
+    - publish: 'target/*.jar'
       artifact: 'javaapp'
 
 # Stage 2: Deploy
