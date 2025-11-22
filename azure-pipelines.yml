@@ -37,9 +37,11 @@ stages:
         ls -lh target
       displayName: 'Debug: List files'
 
-    # Publish the WAR artifact
-    - publish: '$(Build.SourcesDirectory)/target/spring-boot-rest-example-*.war'
-      artifact: 'javaapp'
+    # ✅ Publish WAR artifact
+    - task: PublishPipelineArtifact@1
+      inputs:
+        targetPath: '$(Build.SourcesDirectory)/target/spring-boot-rest-example-*.war'
+        artifactName: 'javaapp'
 
 # =========================
 # Stage 2: Deploy
