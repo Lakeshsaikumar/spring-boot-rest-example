@@ -17,7 +17,7 @@ stages:
     steps:
     - checkout: self
 
-    # Build the project using Maven
+    # Build the project using Maven and create WAR
     - task: Maven@3
       inputs:
         mavenPomFile: 'pom.xml'
@@ -26,10 +26,7 @@ stages:
         jdkVersionOption: '1.11'
         jdkArchitectureOption: 'x64'
         publishJUnitResults: true
-        testResultsFiles: '**/surefire-reports/TEST-*.xml'
-        goals: 'clean package'
-
-    # Debug: List files to verify WAR
+           # Debug: List files to verify WAR
     - script: |
         echo "Listing repository root:"
         ls -lh
@@ -50,7 +47,8 @@ stages:
   jobs:
   - job: DeployJob
     displayName: 'Deploy to Remote Server'
-    pool: 'Java_Deployment'   # Self-hosted agent pool
+    pool:
+      name: 'Java_Deployment'   # Self-hosted agent pool
     steps:
     # Download the artifact from Build stage
     - download: current
