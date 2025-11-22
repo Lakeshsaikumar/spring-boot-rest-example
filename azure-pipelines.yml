@@ -26,16 +26,17 @@ stages:
         jdkVersionOption: '1.11'
         jdkArchitectureOption: 'x64'
         publishJUnitResults: true
-           # Debug: List files to verify WAR
+        testResultsFiles: '**/surefire-reports/TEST-*.xml'
+        goals: 'clean package spring-boot:repackage'
+
+    # Debug: List files to verify WAR
     - script: |
         echo "Listing repository root:"
-        ls -lh
-        echo "Listing target folder:"
-        ls -lh target
+        ls - ls -lh target
       displayName: 'Debug: List files'
 
     # Publish the WAR artifact
-    - publish: 'target/spring-boot-rest-example-*.war'
+    - publish: '$(Build.SourcesDirectory)/target/spring-boot-rest-example-*.war'
       artifact: 'javaapp'
 
 # =========================
