@@ -1,17 +1,22 @@
+
 trigger:
 - master
 
 stages:
 
+# =========================
 # Stage 1: Build
+# =========================
 - stage: Build
   displayName: 'Build and Test'
   jobs:
   - job: BuildJob
     displayName: 'Build Maven Project'
     pool:
-      vmImage: ubuntu-latest
+      vmImage: 'ubuntu-latest'
     steps:
+    - checkout: self
+
     # Build the project using Maven
     - task: Maven@3
       inputs:
@@ -36,15 +41,16 @@ stages:
     - publish: 'target/spring-boot-rest-example-*.war'
       artifact: 'javaapp'
 
+# =========================
 # Stage 2: Deploy
+# =========================
 - stage: Deploy
   displayName: 'Deploy Artifact'
   dependsOn: Build
   jobs:
   - job: DeployJob
-    displayName: 'Deploy to Environment'
-    pool:
-      name: Java_Deployment   # Self-hosted agent
+    displayName: 'Deploy to Remote Server'
+    pool: 'Java_Deployment'   # Self-hosted agent pool
     steps:
     # Download the artifact from Build stage
     - download: current
@@ -53,8 +59,8 @@ stages:
     # Copy artifact over SSH to remote server
     - task: CopyFilesOverSSH@0
       inputs:
-        sshEndpoint: 'Java_YAML'  # SSH service connection
-        sourceFolder: '$(Pipeline.Workspace)/javaapp/target'
+        sshEndpoint: 'Java_YAML'  # SSH service connection name
+        sourceFolder: '$(Pipeline.Workspace)/javaapp'
         contents: '*.war'
         targetFolder: '/home/itadmin/javaapp'
         cleanTargetFolder: false
@@ -68,5 +74,7 @@ stages:
           echo "Stopping existing backend application (if any)..."
           pkill -f spring-boot-rest-example-*.war || true
           echo "Starting new backend application..."
-          nohup java -jar /home/itadmin/javaapp/spring-boot-rest-example-*.war --spring.config.location=file:/home/itadmin/javaapp/application.properties > app.log 2>&1 &
+          nohup java -jar /home/itadmin/javaapp/spring-boot-rest-example-*.war \
+            --spring.config.location=file:/home/itadmin/javaapp/application.properties \
+            > /home/itadmin/javaapp/app.log 2>&1 &
           echo "Deployment completed"
