@@ -71,4 +71,4 @@ stages:
             --spring.config.location=file:/home/itadmin/javaapp/application.properties \
             > /home/itadmin/javaapp/app.log 2>&1 &
 
-          echo "Application started in background. Check app.log for startup details."
+          echo "Application started in background. Check app.log for details."
