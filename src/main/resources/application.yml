@@ -19,7 +19,7 @@ security:
 
 #management endpoints on a separate port
 management:
-  port: 8092
+  port: 8090
   security:
     enabled: false # management port is internal only. no need to secure it.
 
