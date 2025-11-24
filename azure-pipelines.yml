@@ -69,9 +69,8 @@ stages:
           ls -lh "/home/itadmin/javaapp"
 
           echo "Finding WAR file..."
-          WAR_FILE=$(ls "/home/itadmin/javaapp"/*.war | head -n 1)
+          WAR_FILE=$(find "/home/itadmin/javaapp" -maxdepth 1 -name "*.war" | head -n 1)
 
-          # SINGLE-LINE CONDITIONAL to avoid multi-line if errors
           [ -z "$WAR_FILE" ] && echo "ERROR: No WAR file found!" && exit 1
           echo "Found WAR: $WAR_FILE"
 
