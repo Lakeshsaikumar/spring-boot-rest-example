@@ -1,3 +1,4 @@
+
 trigger:
 - master
 
@@ -34,7 +35,6 @@ stages:
         artifactName: 'javaapp'
 
 
-
 # =========================
 # Stage 2: Deploy
 # =========================
@@ -63,12 +63,22 @@ stages:
         sshEndpoint: 'Java_YAML'
         runOptions: 'commands'
         commands: |
-          echo "Stopping old application..."
-          pkill -f spring-boot-rest-example-*.war || true
+          echo "Checking and killing process on port 8090..."
+          PID=$(lsof -t -i:8090)
+          if [ -n "$PID" ]; then
+            echo "Found process $PID on port 8090. Killing..."
+            kill -9 $PID
+          else
+            echo "No process found on port 8090."
+          fi
 
           echo "Starting new application..."
           nohup java -jar /home/itadmin/javaapp/spring-boot-rest-example-*.war \
             --spring.config.location=file:/home/itadmin/javaapp/application.properties \
             > /home/itadmin/javaapp/app.log 2>&1 &
 
-          echo "Application started in background. Check app.log for details."
+          echo "Waiting for application to start..."
+          sleep 15
+
+          echo "Performing health check..."
+          curl -f http://localhost:8090/actuator/health || echo "Health check failed!"
