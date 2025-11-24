@@ -1,9 +1,9 @@
-
+ 
 trigger:
 - master
-
+ 
 stages:
-
+ 
 # =========================
 # Stage 1: Build
 # =========================
@@ -16,25 +16,25 @@ stages:
       vmImage: 'ubuntu-latest'
     steps:
     - checkout: self
-
+ 
     - task: Maven@3
       inputs:
         mavenPomFile: 'pom.xml'
         goals: 'clean package spring-boot:repackage'
         javaHomeOption: 'JDKVersion'
         jdkVersionOption: '1.11'
-
+ 
     - script: |
         echo "Listing target folder:"
         ls -lh target
       displayName: 'Debug: List files'
-
+ 
+    # ✅ Publish entire target folder (contains WAR)
     - task: PublishPipelineArtifact@1
       inputs:
         targetPath: '$(Build.SourcesDirectory)/target'
         artifactName: 'javaapp'
-
-
+ 
 # =========================
 # Stage 2: Deploy
 # =========================
@@ -49,36 +49,22 @@ stages:
     steps:
     - download: current
       artifact: 'javaapp'
-
+ 
     - task: CopyFilesOverSSH@0
       inputs:
         sshEndpoint: 'Java_YAML'
         sourceFolder: '$(Pipeline.Workspace)/javaapp'
         contents: '*.war'
         targetFolder: '/home/itadmin/javaapp'
-
+ 
     - task: SSH@0
-      displayName: "Restart Spring Boot App on Remote Server"
       inputs:
         sshEndpoint: 'Java_YAML'
         runOptions: 'commands'
         commands: |
-          echo "Checking and killing process on port 8090..."
-          PID=$(lsof -t -i:8090)
-          if [ -n "$PID" ]; then
-            echo "Found process $PID on port 8090. Killing..."
-            kill -9 $PID
-          else
-            echo "No process found on port 8090."
-          fi
-
-          echo "Starting new application..."
+          pkill -f spring-boot-rest-example-*.war || true
           nohup java -jar /home/itadmin/javaapp/spring-boot-rest-example-*.war \
             --spring.config.location=file:/home/itadmin/javaapp/application.properties \
             > /home/itadmin/javaapp/app.log 2>&1 &
-
-          echo "Waiting for application to start..."
-          sleep 15
-
-          echo "Performing health check..."
-          curl -f http://localhost:8090/actuator/health || echo "Health check failed!"
+ 
+ 
