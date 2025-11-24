@@ -51,6 +51,7 @@ stages:
     - download: current
       artifact: 'javaapp'
 
+    # Copy WAR to server
     - task: CopyFilesOverSSH@0
       inputs:
         sshEndpoint: 'Java_YAML'
@@ -58,21 +59,25 @@ stages:
         contents: '*.war'
         targetFolder: '/home/itadmin/javaapp'
 
+    # SSH Commands (FULLY FIXED)
     - task: SSH@0
       inputs:
         sshEndpoint: 'Java_YAML'
         runOptions: 'commands'
         commands: |
           echo "========================================="
-          echo "Stopping old Spring Boot process on port 8091"
+          echo "Checking for running process on port 8091"
           echo "========================================="
 
           PID=$(lsof -t -i:8091)
+
           if [ -n "$PID" ]; then
-            echo "Process running on port 8091: $PID — killing it..."
-            kill -9 $PID
+              echo "Found process using port 8091: $PID"
+              echo "Killing process..."
+              kill -9 $PID
+              echo "Process killed."
           else
-            echo "No process running on port 8091."
+              echo "No process running on port 8091."
           fi
 
           echo ""
@@ -81,6 +86,12 @@ stages:
           echo "========================================="
 
           WAR_FILE=$(ls /home/itadmin/javaapp/*.war | head -n 1)
+
+          if [ -z "$WAR_FILE" ]; then
+              echo "ERROR: No WAR file found in /home/itadmin/javaapp"
+              exit 1
+          fi
+
           echo "Using WAR file: $WAR_FILE"
 
           nohup java -jar "$WAR_FILE" \
