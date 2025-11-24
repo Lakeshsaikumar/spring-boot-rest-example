@@ -1,9 +1,8 @@
- 
 trigger:
 - master
- 
+
 stages:
- 
+
 # =========================
 # Stage 1: Build
 # =========================
@@ -14,27 +13,28 @@ stages:
     displayName: 'Build Maven Project'
     pool:
       vmImage: 'ubuntu-latest'
+
     steps:
     - checkout: self
- 
+
     - task: Maven@3
       inputs:
         mavenPomFile: 'pom.xml'
         goals: 'clean package spring-boot:repackage'
         javaHomeOption: 'JDKVersion'
         jdkVersionOption: '1.11'
- 
+
     - script: |
         echo "Listing target folder:"
         ls -lh target
       displayName: 'Debug: List files'
- 
-    # ✅ Publish entire target folder (contains WAR)
+
+    # Publish entire target folder containing the WAR
     - task: PublishPipelineArtifact@1
       inputs:
         targetPath: '$(Build.SourcesDirectory)/target'
         artifactName: 'javaapp'
- 
+
 # =========================
 # Stage 2: Deploy
 # =========================
@@ -46,25 +46,45 @@ stages:
     displayName: 'Deploy to Remote Server'
     pool:
       name: 'Java_Deployment'
+
     steps:
     - download: current
       artifact: 'javaapp'
- 
+
     - task: CopyFilesOverSSH@0
       inputs:
         sshEndpoint: 'Java_YAML'
         sourceFolder: '$(Pipeline.Workspace)/javaapp'
         contents: '*.war'
         targetFolder: '/home/itadmin/javaapp'
- 
+
     - task: SSH@0
       inputs:
         sshEndpoint: 'Java_YAML'
         runOptions: 'commands'
         commands: |
-          pkill -f spring-boot-rest-example-*.war || true
-          nohup java -jar /home/itadmin/javaapp/spring-boot-rest-example-*.war \
+          echo "========================================="
+          echo "Stopping old Spring Boot process on port 8091"
+          echo "========================================="
+
+          PID=$(lsof -t -i:8091)
+          if [ -n "$PID" ]; then
+            echo "Process running on port 8091: $PID — killing it..."
+            kill -9 $PID
+          else
+            echo "No process running on port 8091."
+          fi
+
+          echo ""
+          echo "========================================="
+          echo "Starting new Spring Boot WAR"
+          echo "========================================="
+
+          WAR_FILE=$(ls /home/itadmin/javaapp/*.war | head -n 1)
+          echo "Using WAR file: $WAR_FILE"
+
+          nohup java -jar "$WAR_FILE" \
             --spring.config.location=file:/home/itadmin/javaapp/application.properties \
             > /home/itadmin/javaapp/app.log 2>&1 &
- 
- 
+
+          echo "Application started successfully."
