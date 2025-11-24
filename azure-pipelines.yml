@@ -3,9 +3,9 @@ trigger:
 
 stages:
 
-# =========================
+# ========================================
 # Stage 1: Build
-# =========================
+# ========================================
 - stage: Build
   displayName: 'Build and Test'
   jobs:
@@ -29,29 +29,29 @@ stages:
         ls -lh target
       displayName: 'Debug: List files'
 
-    # Publish entire target folder containing the WAR
     - task: PublishPipelineArtifact@1
       inputs:
         targetPath: '$(Build.SourcesDirectory)/target'
         artifactName: 'javaapp'
 
-# =========================
+# ========================================
 # Stage 2: Deploy
-# =========================
+# ========================================
 - stage: Deploy
   displayName: 'Deploy Artifact'
   dependsOn: Build
+
   jobs:
   - job: DeployJob
-    displayName: 'Deploy to Remote Server'
+    displayName: 'Deploy to Remote Linux Server'
     pool:
       name: 'Java_Deployment'
 
     steps:
+
     - download: current
       artifact: 'javaapp'
 
-    # Copy WAR to server
     - task: CopyFilesOverSSH@0
       inputs:
         sshEndpoint: 'Java_YAML'
@@ -59,43 +59,32 @@ stages:
         contents: '*.war'
         targetFolder: '/home/itadmin/javaapp'
 
-    # SSH Commands (FULLY FIXED)
     - task: SSH@0
       inputs:
         sshEndpoint: 'Java_YAML'
         runOptions: 'commands'
         commands: |
-          echo "========================================="
-          echo "Checking for running process on port 8091"
-          echo "========================================="
+          echo "====================================="
+          echo " Checking for process using port 8091"
+          echo "====================================="
 
           PID=$(lsof -t -i:8091)
 
-          if [ -n "$PID" ]; then
-              echo "Found process using port 8091: $PID"
-              echo "Killing process..."
-              kill -9 $PID
-              echo "Process killed."
-          else
-              echo "No process running on port 8091."
-          fi
+          [ -n "$PID" ] && echo "Killing old process $PID" && kill -9 $PID || echo "No process running on 8091"
 
-          echo ""
-          echo "========================================="
-          echo "Starting new Spring Boot WAR"
-          echo "========================================="
+          echo "====================================="
+          echo " Finding WAR file"
+          echo "====================================="
 
           WAR_FILE=$(ls /home/itadmin/javaapp/*.war | head -n 1)
+          echo "Using WAR: $WAR_FILE"
 
-          if [ -z "$WAR_FILE" ]; then
-              echo "ERROR: No WAR file found in /home/itadmin/javaapp"
-              exit 1
-          fi
-
-          echo "Using WAR file: $WAR_FILE"
+          echo "====================================="
+          echo " Starting Spring Boot Application"
+          echo "====================================="
 
           nohup java -jar "$WAR_FILE" \
             --spring.config.location=file:/home/itadmin/javaapp/application.properties \
             > /home/itadmin/javaapp/app.log 2>&1 &
 
-          echo "Application started successfully."
+          echo "Application deployed and started successfully."
