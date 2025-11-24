@@ -10,7 +10,6 @@ stages:
   displayName: 'Build and Test'
   jobs:
   - job: BuildJob
-    displayName: 'Build Maven Project'
     pool:
       vmImage: 'ubuntu-latest'
 
@@ -42,22 +41,18 @@ stages:
   dependsOn: Build
   jobs:
   - job: DeployJob
-    displayName: 'Deploy to Remote Server'
     pool:
       name: 'Java_Deployment'
 
     steps:
-    # Download artifact
     - download: current
       artifact: javaapp
 
-    # Debug: list downloaded files
     - script: |
         echo "DEBUG: Files downloaded to agent:"
         ls -lh "$(Pipeline.Workspace)/javaapp"
       displayName: 'DEBUG: List artifact files'
 
-    # Copy WAR to remote server
     - task: CopyFilesOverSSH@0
       inputs:
         sshEndpoint: Java_YAML
@@ -65,7 +60,6 @@ stages:
         contents: '*.war'
         targetFolder: "/home/itadmin/javaapp"
 
-    # SSH to deploy and start app
     - task: SSH@0
       inputs:
         sshEndpoint: Java_YAML
@@ -77,10 +71,8 @@ stages:
           echo "Finding WAR file..."
           WAR_FILE=$(ls "/home/itadmin/javaapp"/*.war | head -n 1)
 
-          if [ -z "$WAR_FILE" ]; then
-            echo "ERROR: No WAR file found!"
-            exit 1
-          fi
+          # SINGLE-LINE CONDITIONAL to avoid multi-line if errors
+          [ -z "$WAR_FILE" ] && echo "ERROR: No WAR file found!" && exit 1
           echo "Found WAR: $WAR_FILE"
 
           echo "Checking port 8091 for old process..."
