@@ -1,8 +1,9 @@
+ 
 trigger:
 - master
-
+ 
 stages:
-
+ 
 # =========================
 # Stage 1: Build
 # =========================
@@ -10,29 +11,30 @@ stages:
   displayName: 'Build and Test'
   jobs:
   - job: BuildJob
+    displayName: 'Build Maven Project'
     pool:
       vmImage: 'ubuntu-latest'
-
     steps:
     - checkout: self
-
+ 
     - task: Maven@3
       inputs:
         mavenPomFile: 'pom.xml'
         goals: 'clean package spring-boot:repackage'
         javaHomeOption: 'JDKVersion'
         jdkVersionOption: '1.11'
-
+ 
     - script: |
         echo "Listing target folder:"
-        ls -lh "target"
+        ls -lh target
       displayName: 'Debug: List files'
-
+ 
+    # ✅ Publish entire target folder (contains WAR)
     - task: PublishPipelineArtifact@1
       inputs:
-        targetPath: "$(Build.SourcesDirectory)/target"
+        targetPath: '$(Build.SourcesDirectory)/target'
         artifactName: 'javaapp'
-
+ 
 # =========================
 # Stage 2: Deploy
 # =========================
@@ -41,46 +43,29 @@ stages:
   dependsOn: Build
   jobs:
   - job: DeployJob
+    displayName: 'Deploy to Remote Server'
     pool:
       name: 'Java_Deployment'
-
     steps:
     - download: current
-      artifact: javaapp
-
-    - script: |
-        echo "DEBUG: Files downloaded to agent:"
-        ls -lh "$(Pipeline.Workspace)/javaapp"
-      displayName: 'DEBUG: List artifact files'
-
+      artifact: 'javaapp'
+ 
     - task: CopyFilesOverSSH@0
       inputs:
-        sshEndpoint: Java_YAML
-        sourceFolder: "$(Pipeline.Workspace)/javaapp"
+        sshEndpoint: 'Java_YAML'
+        sourceFolder: '$(Pipeline.Workspace)/javaapp'
         contents: '*.war'
-        targetFolder: "/home/itadmin/javaapp"
-
+        targetFolder: '/home/itadmin/javaapp'
+ 
     - task: SSH@0
       inputs:
-        sshEndpoint: Java_YAML
-        runOptions: commands
+        sshEndpoint: 'Java_YAML'
+        runOptions: 'commands'
         commands: |
-          echo "DEBUG: Listing files on remote server:"
-          ls -lh "/home/itadmin/javaapp"
-
-          echo "Finding WAR file..."
-          WAR_FILE=$(find "/home/itadmin/javaapp" -maxdepth 1 -name "*.war" | head -n 1)
-
-          [ -z "$WAR_FILE" ] && echo "ERROR: No WAR file found!" && exit 1
-          echo "Found WAR: $WAR_FILE"
-
-          echo "Checking port 8091 for old process..."
-          PID=$(lsof -t -i:8091)
-          [ -n "$PID" ] && echo "Killing old process $PID" && kill -9 $PID || echo "No process running on 8091"
-
-          echo "Starting Spring Boot application..."
-          nohup java -jar "$WAR_FILE" \
+          pkill -f spring-boot-rest-example-*.war || true
+          nohup java -jar /home/itadmin/javaapp/spring-boot-rest-example-*.war \
             --spring.config.location=file:/home/itadmin/javaapp/application.properties \
-            > "/home/itadmin/javaapp/app.log" 2>&1 &
-
-          echo "Application deployed and started successfully."
+            > /home/itadmin/javaapp/app.log 2>&1 &
+ 
+ 
+ 
