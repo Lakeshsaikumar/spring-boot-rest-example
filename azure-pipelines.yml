@@ -26,12 +26,12 @@ stages:
 
     - script: |
         echo "Listing target folder:"
-        ls -lh target
+        ls -lh "target"
       displayName: 'Debug: List files'
 
     - task: PublishPipelineArtifact@1
       inputs:
-        targetPath: '$(Build.SourcesDirectory)/target'
+        targetPath: "$(Build.SourcesDirectory)/target"
         artifactName: 'javaapp'
 
 # =========================
@@ -54,46 +54,42 @@ stages:
     # Debug: list downloaded files
     - script: |
         echo "DEBUG: Files downloaded to agent:"
-        ls -lh $(Pipeline.Workspace)/javaapp
+        ls -lh "$(Pipeline.Workspace)/javaapp"
       displayName: 'DEBUG: List artifact files'
 
     # Copy WAR to remote server
     - task: CopyFilesOverSSH@0
       inputs:
         sshEndpoint: Java_YAML
-        sourceFolder: '$(Pipeline.Workspace)/javaapp'
+        sourceFolder: "$(Pipeline.Workspace)/javaapp"
         contents: '*.war'
-        targetFolder: '/home/itadmin/javaapp'
+        targetFolder: "/home/itadmin/javaapp"
 
-    # SSH to deploy and start app (single-line if)
+    # SSH to deploy and start app
     - task: SSH@0
       inputs:
         sshEndpoint: Java_YAML
         runOptions: commands
         commands: |
           echo "DEBUG: Listing files on remote server:"
-          ls -lh /home/itadmin/javaapp
+          ls -lh "/home/itadmin/javaapp"
 
           echo "Finding WAR file..."
-          WAR_FILE=$(ls /home/itadmin/javaapp/*.war | head -n 1)
+          WAR_FILE=$(ls "/home/itadmin/javaapp"/*.war | head -n 1)
 
-          # Fail if no WAR
           if [ -z "$WAR_FILE" ]; then
             echo "ERROR: No WAR file found!"
             exit 1
           fi
-
           echo "Found WAR: $WAR_FILE"
 
           echo "Checking port 8091 for old process..."
           PID=$(lsof -t -i:8091)
-
-          # Single-line conditional to kill old process
-          [ -n "$PID" ] && echo "Killing old process $PID" && kill -9 $PID || echo "No process running"
+          [ -n "$PID" ] && echo "Killing old process $PID" && kill -9 $PID || echo "No process running on 8091"
 
           echo "Starting Spring Boot application..."
           nohup java -jar "$WAR_FILE" \
             --spring.config.location=file:/home/itadmin/javaapp/application.properties \
-            > /home/itadmin/javaapp/app.log 2>&1 &
+            > "/home/itadmin/javaapp/app.log" 2>&1 &
 
           echo "Application deployed and started successfully."
