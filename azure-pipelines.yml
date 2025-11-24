@@ -3,9 +3,9 @@ trigger:
 
 stages:
 
-# ========================================
+# =========================
 # Stage 1: Build
-# ========================================
+# =========================
 - stage: Build
   displayName: 'Build and Test'
   jobs:
@@ -34,55 +34,64 @@ stages:
         targetPath: '$(Build.SourcesDirectory)/target'
         artifactName: 'javaapp'
 
-# ========================================
+# =========================
 # Stage 2: Deploy
-# ========================================
+# =========================
 - stage: Deploy
   displayName: 'Deploy Artifact'
   dependsOn: Build
-
   jobs:
   - job: DeployJob
-    displayName: 'Deploy to Remote Linux Server'
+    displayName: 'Deploy to Remote Server'
     pool:
       name: 'Java_Deployment'
 
     steps:
-
+    # Download artifact
     - download: current
-      artifact: 'javaapp'
+      artifact: javaapp
 
+    # Debug: list downloaded files
+    - script: |
+        echo "DEBUG: Files downloaded to agent:"
+        ls -lh $(Pipeline.Workspace)/javaapp
+      displayName: 'DEBUG: List artifact files'
+
+    # Copy WAR to remote server
     - task: CopyFilesOverSSH@0
       inputs:
-        sshEndpoint: 'Java_YAML'
+        sshEndpoint: Java_YAML
         sourceFolder: '$(Pipeline.Workspace)/javaapp'
         contents: '*.war'
         targetFolder: '/home/itadmin/javaapp'
 
+    # SSH to deploy and start app (single-line if)
     - task: SSH@0
       inputs:
-        sshEndpoint: 'Java_YAML'
-        runOptions: 'commands'
+        sshEndpoint: Java_YAML
+        runOptions: commands
         commands: |
-          echo "====================================="
-          echo " Checking for process using port 8091"
-          echo "====================================="
+          echo "DEBUG: Listing files on remote server:"
+          ls -lh /home/itadmin/javaapp
 
+          echo "Finding WAR file..."
+          WAR_FILE=$(ls /home/itadmin/javaapp/*.war | head -n 1)
+
+          # Fail if no WAR
+          if [ -z "$WAR_FILE" ]; then
+            echo "ERROR: No WAR file found!"
+            exit 1
+          fi
+
+          echo "Found WAR: $WAR_FILE"
+
+          echo "Checking port 8091 for old process..."
           PID=$(lsof -t -i:8091)
 
-          [ -n "$PID" ] && echo "Killing old process $PID" && kill -9 $PID || echo "No process running on 8091"
+          # Single-line conditional to kill old process
+          [ -n "$PID" ] && echo "Killing old process $PID" && kill -9 $PID || echo "No process running"
 
-          echo "====================================="
-          echo " Finding WAR file"
-          echo "====================================="
-
-          WAR_FILE=$(ls /home/itadmin/javaapp/*.war | head -n 1)
-          echo "Using WAR: $WAR_FILE"
-
-          echo "====================================="
-          echo " Starting Spring Boot Application"
-          echo "====================================="
-
+          echo "Starting Spring Boot application..."
           nohup java -jar "$WAR_FILE" \
             --spring.config.location=file:/home/itadmin/javaapp/application.properties \
             > /home/itadmin/javaapp/app.log 2>&1 &
